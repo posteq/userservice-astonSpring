@@ -1,22 +1,21 @@
 package ru.acton.ivantkachuk.userservice.integration;
 
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import ru.acton.ivantkachuk.userservice.dto.UserRequestDto;
 import ru.acton.ivantkachuk.userservice.dto.UserResponseDto;
 import ru.acton.ivantkachuk.userservice.entity.User;
+import ru.acton.ivantkachuk.userservice.exception.impl.EntityFoundWithEmailException;
 import ru.acton.ivantkachuk.userservice.exception.impl.EntityNotFoundException;
 import ru.acton.ivantkachuk.userservice.exception.impl.EntityNotFoundWithEmailException;
 import ru.acton.ivantkachuk.userservice.repository.UserRepository;
@@ -31,45 +30,39 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Testcontainers
-@Sql({
-        "classpass:sql/data.sql"
-})
-public class UserServiceIT {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:latest");
-
-    @BeforeAll
-    static void beforeAll() {
-        postgres.start();
-    }
-
-    @AfterAll
-    static void afterAll() {
-        postgres.stop();
-    }
-
-    @DynamicPropertySource
-    static void setProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-    }
-
+@Transactional
+class UserServiceIntegrationTest {
     @Autowired
     private UserService userService;
 
     @Autowired
     private UserRepository userRepository;
 
+    static final PostgreSQLContainer<?> container = new PostgreSQLContainer<>("postgres:15-alpine");
+
+    @DynamicPropertySource
+    static void postgresProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", container::getJdbcUrl);
+    }
+
+    @BeforeAll
+    static void runContainer() {
+        container.start();
+    }
+
+    @AfterAll
+    static void stopContainer() {
+        container.stop();
+    }
+
     @Test
-    @DisplayName("Should create user successfully")
     void shouldCreateUserSuccessfully() {
         //given
-        UserRequestDto userRequestDto = new UserRequestDto();
-        userRequestDto.setEmail("test@example.com");
-        userRequestDto.setName("Test User");
+        UserRequestDto userRequestDto = UserRequestDto.builder()
+                .name("Test User")
+                .age(25)
+                .email("test@example.com")
+                .build();
 
         //when
         UserResponseDto result = userService.create(userRequestDto);
@@ -79,6 +72,7 @@ public class UserServiceIT {
         assertThat(result.getId()).isNotNull();
         assertThat(result.getEmail()).isEqualTo("test@example.com");
         assertThat(result.getName()).isEqualTo("Test User");
+        assertThat(result.getAge()).isEqualTo(25);
 
         Optional<User> savedUser = userRepository.findById(result.getId());
         assertThat(savedUser).isPresent();
@@ -86,12 +80,14 @@ public class UserServiceIT {
     }
 
     @Test
-    @DisplayName("Should get user by ID successfully")
     void shouldGetUserByIdSuccessfully() {
         //given
-        User user = new User();
-        user.setEmail("test@example.com");
-        user.setName("Test User");
+        User user = User.builder()
+                .name("Test User 2")
+                .email("test2@example.com")
+                .age(23)
+                .build();
+
         User savedUser = userRepository.save(user);
 
         //when
@@ -100,33 +96,36 @@ public class UserServiceIT {
         //then
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(savedUser.getId());
-        assertThat(result.getEmail()).isEqualTo("test@example.com");
-        assertThat(result.getName()).isEqualTo("Test User");
+        assertThat(result.getEmail()).isEqualTo("test2@example.com");
+        assertThat(result.getName()).isEqualTo("Test User 2");
+        assertThat(result.getAge()).isEqualTo(23);
     }
 
     @Test
-    @DisplayName("Should throw EntityNotFoundException when user not found by ID")
     void shouldThrowEntityNotFoundExceptionWhenUserNotFoundById() {
         //given
         Long nonExistentId = 999L;
 
-        //when
+        //when & then
         assertThrows(EntityNotFoundException.class,
                 () -> userService.getUserById(nonExistentId));
     }
 
     @Test
-    @DisplayName("Should update user successfully")
     void shouldUpdateUserSuccessfully() {
         //given
-        User user = new User();
-        user.setEmail("old@example.com");
-        user.setName("Old Name");
+        User user = User.builder()
+                .name("Old Name")
+                .email("old@example.com")
+                .age(30)
+                .build();
+
         User savedUser = userRepository.save(user);
 
-        UserRequestDto updateDto = new UserRequestDto();
-        updateDto.setEmail("new@example.com");
-        updateDto.setName("New Name");
+        UserRequestDto updateDto = UserRequestDto.builder()
+                .email("new@example.com")
+                .build();
+
 
         //when
         UserResponseDto result = userService.updateUser(savedUser.getId(), updateDto);
@@ -136,35 +135,43 @@ public class UserServiceIT {
         assertThat(result.getId()).isEqualTo(savedUser.getId());
         assertThat(result.getEmail()).isEqualTo("new@example.com");
 
+
         Optional<User> updatedUser = userRepository.findById(savedUser.getId());
         assertThat(updatedUser).isPresent();
         assertThat(updatedUser.get().getEmail()).isEqualTo("new@example.com");
     }
 
     @Test
-    @DisplayName("Should throw EntityNotFoundException when updating non-existent user")
     void shouldThrowEntityNotFoundExceptionWhenUpdatingNonExistentUser() {
         //given
         Long nonExistentId = 999L;
-        UserRequestDto updateDto = new UserRequestDto();
-        updateDto.setEmail("new@example.com");
+        UserRequestDto updateDto = UserRequestDto.builder()
+                .name("New Name")
+                .email("new@example.com")
+                .age(40)
+                .build();
 
-        //when
+        //when & then
         assertThrows(EntityNotFoundException.class,
                 () -> userService.updateUser(nonExistentId, updateDto));
     }
 
     @Test
-    @DisplayName("Should get all users successfully")
     void shouldGetAllUsersSuccessfully() {
         //given
-        User user1 = new User();
-        user1.setEmail("user1@example.com");
-        user1.setName("User One");
+        userRepository.deleteAll();
 
-        User user2 = new User();
-        user2.setEmail("user2@example.com");
-        user2.setName("User Two");
+        User user1 = User.builder()
+                .name("User One")
+                .email("user1@example.com")
+                .age(32)
+                .build();
+
+        User user2 = User.builder()
+                .name("User Two")
+                .email("user2@example.com")
+                .age(37)
+                .build();
 
         userRepository.saveAll(List.of(user1, user2));
 
@@ -179,8 +186,10 @@ public class UserServiceIT {
     }
 
     @Test
-    @DisplayName("Should return empty list when no users exist")
     void shouldReturnEmptyListWhenNoUsersExist() {
+        //given
+        userRepository.deleteAll();
+
         //when
         List<UserResponseDto> result = userService.getAllUsers();
 
@@ -189,41 +198,45 @@ public class UserServiceIT {
     }
 
     @Test
-    @DisplayName("Should get user by email successfully")
     void shouldGetUserByEmailSuccessfully() {
         //given
-        User user = new User();
-        user.setEmail("test@example.com");
-        user.setName("Test User");
+        User user = User.builder()
+                .name("Email Test User")
+                .email("email-test@example.com")
+                .age(27)
+                .build();
+
         userRepository.save(user);
 
         //when
-        UserResponseDto result = userService.getUserByEmail("test@example.com");
+        UserResponseDto result = userService.getUserByEmail("email-test@example.com");
 
         //then
         assertThat(result).isNotNull();
-        assertThat(result.getEmail()).isEqualTo("test@example.com");
-        assertThat(result.getName()).isEqualTo("Test User");
+        assertThat(result.getEmail()).isEqualTo("email-test@example.com");
+        assertThat(result.getName()).isEqualTo("Email Test User");
+        assertThat(result.getAge()).isEqualTo(27);
     }
 
     @Test
-    @DisplayName("Should throw EntityNotFoundWithEmailException when user not found by email")
     void shouldThrowEntityNotFoundWithEmailExceptionWhenUserNotFoundByEmail() {
         //given
         String nonExistentEmail = "nonexistent@example.com";
 
-        //when
+        //when & then
         assertThrows(EntityNotFoundWithEmailException.class,
                 () -> userService.getUserByEmail(nonExistentEmail));
     }
 
     @Test
-    @DisplayName("Should delete user by ID successfully")
     void shouldDeleteUserByIdSuccessfully() {
         //given
-        User user = new User();
-        user.setEmail("test@example.com");
-        user.setName("Test User");
+        User user = User.builder()
+                .name("Delete Test User")
+                .email("delete-test@example.com")
+                .age(30)
+                .build();
+
         User savedUser = userRepository.save(user);
 
         //when
@@ -235,30 +248,33 @@ public class UserServiceIT {
     }
 
     @Test
-    @DisplayName("Should handle delete of non-existent user gracefully")
     void shouldHandleDeleteOfNonExistentUserGracefully() {
         //given
         Long nonExistentId = 999L;
-        
+
+        //when & then
         assertDoesNotThrow(() -> userService.deleteUserById(nonExistentId));
     }
 
     @Test
-    @DisplayName("Should handle duplicate email creation")
     void shouldHandleDuplicateEmailCreation() {
         //given
-        User existingUser = new User();
-        existingUser.setEmail("duplicate@example.com");
-        existingUser.setName("Existing User");
+        User existingUser = User.builder()
+                .name("Existing Use")
+                .email("duplicate@example.com")
+                .age(45)
+                .build();
+
         userRepository.save(existingUser);
 
-        UserRequestDto duplicateDto = new UserRequestDto();
-        duplicateDto.setEmail("duplicate@example.com");
-        duplicateDto.setName("Duplicate User");
+        UserRequestDto duplicateDto = UserRequestDto.builder()
+                .name("Duplicate User")
+                .email("duplicate@example.com")
+                .age(55)
+                .build();
 
-        //when
-        assertThrows(DataIntegrityViolationException.class,
+        //when & then
+        assertThrows(EntityFoundWithEmailException.class,
                 () -> userService.create(duplicateDto));
     }
-    
 }

@@ -4,10 +4,6 @@ spring:
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
-  jpa:
-    properties.hibernate:
-      batch_size: 50
-      fetch_size: 50
-      show_sql: true
-      format_sql: true
-      hbm2ddl.auto: validate
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml

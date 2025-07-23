@@ -3,6 +3,7 @@ package ru.acton.ivantkachuk.userservice.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.acton.ivantkachuk.userservice.exception.impl.EntityFoundWithEmailException;
 import ru.acton.ivantkachuk.userservice.exception.impl.EntityNotFoundException;
 import ru.acton.ivantkachuk.userservice.dto.UserRequestDto;
 import ru.acton.ivantkachuk.userservice.dto.UserResponseDto;
@@ -23,7 +24,7 @@ public class UserService {
 
     public UserResponseDto create(UserRequestDto userRequestDto) {
         if (userRepository.existsByEmail(userRequestDto.getEmail())) {
-            throw new DuplicateEmailException("Email already exists: " + userRequestDto.getEmail());
+            throw new EntityFoundWithEmailException(userRequestDto.getEmail());
         }
         User savedUser = userRepository.save(userMapper.toEntity(userRequestDto));
         return userMapper.toDto(savedUser);

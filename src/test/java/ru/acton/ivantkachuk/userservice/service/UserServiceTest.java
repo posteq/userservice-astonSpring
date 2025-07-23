@@ -6,8 +6,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import ru.acton.ivantkachuk.userservice.controller.UserController;
 import ru.acton.ivantkachuk.userservice.dto.UserRequestDto;
 import ru.acton.ivantkachuk.userservice.dto.UserResponseDto;
 import ru.acton.ivantkachuk.userservice.entity.User;
@@ -27,7 +25,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-@WebMvcTest(UserController.class)
+@ExtendWith(MockitoExtension.class)
 class UserServiceTest {
     @Mock
     private UserRepository userRepository;
