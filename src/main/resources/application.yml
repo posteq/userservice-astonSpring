@@ -7,3 +7,8 @@ spring:
   liquibase:
     enabled: true
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  kafka:
+    host: localhost:9092
+    topics:
+      user-events:
+        name: user_events

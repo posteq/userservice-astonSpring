@@ -36,6 +36,6 @@ public class User {
     @Column(name = "age" , nullable = false)
     private Integer age;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDate createdAt;
 }
