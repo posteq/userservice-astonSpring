@@ -96,7 +96,7 @@ class UserControllerTest {
         //given
         doReturn(testUserResponseDto).when(userService).create(any(UserRequestDto.class));
         //when
-        mockMvc.perform(post("/user")
+        mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Test User\", " +
                                 "\"id\":1}"))
@@ -123,7 +123,7 @@ class UserControllerTest {
         doReturn(users).when(userService).getAllUsers();
 
         // when
-        mockMvc.perform(get("/user"))
+        mockMvc.perform(get("/users"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$", hasSize(2)))
@@ -142,7 +142,7 @@ class UserControllerTest {
         doReturn(testUserResponseDto).when(userService).getUserByEmail(email);
 
         //when
-        mockMvc.perform(get("/user/by-email/{email}", email))
+        mockMvc.perform(get("/users/by-email/{email}", email))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(1L))
